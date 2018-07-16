@@ -1,7 +1,24 @@
+"""
+This is the first attempt at building an encoder-decoder network for text style transfer.
+It uses a classifier to train style and reconstruction to enforce content preservation.
+
+The model is based on the work by dos Santos et. al (2018), "Fighting Offensive Language on Social Media with
+Unsupervised Text Style Transfer".
+
+Improvements:
+    Attention
+    Noise added to the inputs
+    Word Embeddings
+    Change input params to dictionary list
+"""
+
 from keras.models import Model
 from keras.layers import LSTM, Dense, Input, Lambda
 from keras import backend as K
 import numpy as np
+
+# Todo: re-engineer model to see if can print outputs midway
+# Todo: fix constructor and other functions so can load model instead of retraining always
 
 class BenchmarkModel(object):
 
@@ -15,6 +32,20 @@ class BenchmarkModel(object):
                  max_timestep=None,
                  max_timestep_classifier=None,
                  train_classifier=False):
+
+        """
+        I don't include:
+            - style label
+            - word embeddings
+            - attention
+            - bi-rnn
+            - noise to inputs
+
+        :param latent_dims:
+        :param classifier_model:
+        :param word2id:
+        :param dropout:
+        """
 
         # Length of the inputs is len(vocab) + 1, the +1 is for the style label
         self.latent_dims = latent_dims
@@ -114,7 +145,15 @@ class BenchmarkModel(object):
         return Lambda(lambda x: K.concatenate(x, axis=1))(all_outputs)
 
     def train(self, inputs, validation, labels, losses, batch_size, epochs, loss_weights, optimizer="adadelta", callbacks=None):
-            pass
+
+        self.model.compile(optimizer=optimizer, loss=losses, loss_weights=loss_weights, metrics=["acc"])
+
+        if self.max_timestep is None:
+            print("Max timestep was set to None i.e. variable sequences so batch size will be set to 1.")
+            batch_size = 1
+
+        self.model.fit(x=inputs, y=labels, validation_data=validation,
+                       batch_size=batch_size, epochs=epochs, callbacks=callbacks)
 
     def inference(self, input_sequence, id2word, max_sequence_length):
         """
@@ -129,7 +168,7 @@ class BenchmarkModel(object):
         # Define encoder model
         # This is a copy of the model that is defined in the constructor.
         """
-        ********Problem statement**********
+        Problem is that the encoder has two inputs connected to it and so expects these for inference
         """
         encoder_inference = Model(self.encoder_inputs, self.encoder_states)
 
@@ -191,3 +230,29 @@ class BenchmarkModel(object):
             states_value = [h, c]
 
         return decoded_sentence
+
+    def get_model(self):
+        return self.model
+
+    def save_model(self, filepath):
+        self.model.save(filepath)
+
+
+# if __name__ == "__main__":
+    # # Test encoding
+    # vocab = dict((key, val) for key, val in zip(["pad", "a", "b", "c"], range(4)))
+    # reverse_vocab = dict((val, key) for key, val in vocab.items())
+    #
+    # print(vocab)
+    # print(reverse_vocab)
+    #
+    # sequence = ["c", "c", "a", "b"]
+    # encoded = one_hot_encode(sequence, vocab)
+    # assert encoded.shape == (len(sequence), len(vocab))
+    # print("encoded sequence:\n", encoded)
+    #
+    # decoded = one_hot_decode(encoded, reverse_vocab)
+    # assert decoded == sequence
+    # print("decoded sequence:", decoded)
+
+
